@@ -54,7 +54,24 @@ import tv.own.owntv.features.subtitles.SubtitleSearchViewModel
  * reordering is safe and a missing binding fails immediately, naming the type.
  */
 val appModule = module {
-    viewModelOf(::ShellViewModel)
+    viewModel {
+        ShellViewModel(
+            settings = get(),
+            sourceRepository = get(),
+            profileDao = get(),
+            connectivity = get(),
+            launcherIntegrationRepository = get(),
+            epgMigration = get(),
+            autoRefresh = get(),
+            weatherRepository = get(),
+            navVisibility = get(),
+            profiles = get(),
+            catalogSyncScheduler = get(),
+            importFinalizer = get(),
+            categoryUnlocks = get(),
+            customize = get(),
+        )
+    }
     // Home's rails are core's, shared with the phone app; the view model only decorates them.
     // LiveEpgReader is registered because GuideReader now needs one: a guide row whose stored data
     // has run out falls back to the provider's short-EPG, which is this reader's to fetch. One
@@ -73,7 +90,17 @@ val appModule = module {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
     }
     viewModelOf(::HomeViewModel)
-    viewModelOf(::SetupViewModel)
+    viewModel {
+        SetupViewModel(
+            importer = get(),
+            epgRepository = get(),
+            epgSourceStore = get(),
+            companion = get(),
+            appScope = get(),
+            profiles = get(),
+            profileDao = get(),
+        )
+    }
     viewModelOf(::DisplaySizeViewModel)
     // Takes a Context first; Koin resolves it from androidContext().
     //
