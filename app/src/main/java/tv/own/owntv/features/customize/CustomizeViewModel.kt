@@ -145,7 +145,6 @@ class CustomizeViewModel(
                     profileDao.observeById(c.profileId),
                 ) { cats, cust, sources, profile ->
                     val providerNames = sources.associate { it.id to it.name }.takeIf { sourceIds.size > 1 }
-                    val orderIndex = cust.categoryOrder.withIndex().associate { (i, k) -> k to i }
                     // Provider folders + the user's custom combined categories in ONE list, so
                     // hide/rename/reorder apply uniformly (their keys share the CustomizeKeys
                     // namespace). Custom rows carry categoryId = null and no provider name.
@@ -177,8 +176,8 @@ class CustomizeViewModel(
                             providerName = providerNames?.get(cat.sourceId),
                         )
                     }
-                    val (pinned, rest) = entries.partition { it.key in orderIndex }
-                    (pinned.sortedBy { orderIndex.getValue(it.key) } + rest)
+                    val (pinned, rest) = entries.partition { it.key in cust.categoryPositions }
+                    (pinned.sortedBy { cust.categoryPositions.getValue(it.key) } + rest)
                         .filter { filter.accepts(it.hidden) }
                 }
             }
@@ -328,7 +327,7 @@ class CustomizeViewModel(
                     hiddenItems = it.hiddenItems.filterKeys { k -> !mine(k) },
                     categoryNames = it.categoryNames.filterKeys { k -> !mine(k) },
                     itemNames = it.itemNames.filterKeys { k -> !mine(k) },
-                    categoryOrder = it.categoryOrder.filterNot(::mine),
+                    categoryPositions = it.categoryPositions.filterKeys { k -> !mine(k) },
                     movedFromOrigin = it.movedFromOrigin.filterKeys { k -> !mine(k) },
                 )
             }
@@ -363,7 +362,7 @@ class CustomizeViewModel(
                 val index = current.indexOfFirst { it.key == row.key }
                 if (index < 0) return@withLock
                 val reordered = moveBlock(current, index, index, kind) ?: return@withLock
-                customize.setCategoryOrder(ctx.value.profileId, _section.value, reordered.map { it.key })
+                customize.saveCategoryMove(ctx.value.profileId, _section.value, reordered.map { it.key }, listOf(row.key))
             }
         }
     }
@@ -401,7 +400,8 @@ class CustomizeViewModel(
                 if (anchorIndex < 0 || endIndex < 0) return@withLock
                 span.setEndKey(endKey)
                 val reordered = moveBlock(current, minOf(anchorIndex, endIndex), maxOf(anchorIndex, endIndex), kind) ?: return@withLock
-                customize.setCategoryOrder(ctx.value.profileId, _section.value, reordered.map { it.key })
+                val movedKeys = current.subList(minOf(anchorIndex, endIndex), maxOf(anchorIndex, endIndex) + 1).map { it.key }
+                customize.saveCategoryMove(ctx.value.profileId, _section.value, reordered.map { it.key }, movedKeys)
             }
         }
     }

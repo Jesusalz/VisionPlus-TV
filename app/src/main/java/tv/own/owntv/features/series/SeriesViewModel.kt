@@ -504,7 +504,7 @@ class SeriesViewModel(
                 val folders = cats.railCategories(
                     cust,
                     kids = profile?.isKids == true,
-                    alphaRest = sort == SettingsRepository.SortMode.ALPHA,
+                    alphabetical = sort == SettingsRepository.SortMode.ALPHA,
                 )
                 val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
                 val categoriesById = cats.associateBy { it.id }
@@ -1196,7 +1196,7 @@ class SeriesViewModel(
         val pid = currentProfileId() ?: return CategoryRestorePlan()
         return planCategoryRestore(customize, contentOrderDao, pid, MediaType.SERIES, contextKey, customCategoryDao) {
             when (key) {
-                is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, Int.MAX_VALUE)
+                is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, false, Int.MAX_VALUE)
                     .mapTo(HashSet()) { CustomizeKeys.series(it) }
                 else -> customCategoryDao.stableItemKeys(pid, contextKey).toSet()
             }
@@ -1220,7 +1220,7 @@ class SeriesViewModel(
                 profileId = c.profileId,
                 sourceIds = c.sourceIds,
                 type = MediaType.SERIES,
-                alphaRest = sortMode.value == SettingsRepository.SortMode.ALPHA,
+                alphabetical = sortMode.value == SettingsRepository.SortMode.ALPHA,
                 key = key,
             )
         }
@@ -1238,7 +1238,7 @@ class SeriesViewModel(
         _categoryMoveState.value = null
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
-            customize.setCategoryOrder(pid, MediaType.SERIES, s.keys)
+            customize.saveCategoryMove(pid, MediaType.SERIES, s.keys, s.carried)
         }
     }
 
@@ -1256,8 +1256,8 @@ class SeriesViewModel(
                 else -> return@launch
             }
             val items = when (key) {
-                is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
-                is LiveKey.Custom -> customCategoryDao.snapshotSeries(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
+                is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, false, 5000)
+                is LiveKey.Custom -> customCategoryDao.snapshotSeries(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, false, 5000)
                 LiveKey.Favorites -> seriesDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.History, LiveKey.All -> return@launch
             }
@@ -1347,7 +1347,7 @@ class SeriesViewModel(
             }
             LiveKey.Favorites -> seriesDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> seriesDao.pagingHistory(c.profileId, ids)
-            is LiveKey.Custom -> customCategoryDao.pagingSeries(c.profileId, key.id, ids)
+            is LiveKey.Custom -> customCategoryDao.pagingSeries(c.profileId, key.id, ids, alpha = !playlist)
             is LiveKey.Folder -> {
                 val ctxKey = folderContextKeys.value[key.id] ?: ""
                 when {
@@ -1356,7 +1356,7 @@ class SeriesViewModel(
                     // Fast path: no manual order in this folder → the plain indexed query has
                     // the identical (sortOrder, name) order without the join-sort.
                     ctxKey !in orderedContexts.value -> seriesDao.pagingByCategory(key.id)
-                    else -> seriesDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)
+                    else -> seriesDao.pagingByCategoryManual(key.id, c.profileId, ctxKey, alpha = !playlist)
                 }
             }
         } else when (key) {

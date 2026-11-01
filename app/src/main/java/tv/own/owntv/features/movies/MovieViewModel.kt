@@ -403,7 +403,7 @@ class MovieViewModel(
                 val folders = cats.railCategories(
                     cust,
                     kids = profile?.isKids == true,
-                    alphaRest = sort == SettingsRepository.SortMode.ALPHA,
+                    alphabetical = sort == SettingsRepository.SortMode.ALPHA,
                 )
                 val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
                 val categoriesById = cats.associateBy { it.id }
@@ -818,7 +818,7 @@ class MovieViewModel(
         val pid = currentProfileId() ?: return CategoryRestorePlan()
         return planCategoryRestore(customize, contentOrderDao, pid, MediaType.MOVIE, contextKey, customCategoryDao) {
             when (key) {
-                is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, Int.MAX_VALUE)
+                is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, false, Int.MAX_VALUE)
                     .mapTo(HashSet()) { CustomizeKeys.movie(it) }
                 else -> customCategoryDao.stableItemKeys(pid, contextKey).toSet()
             }
@@ -842,7 +842,7 @@ class MovieViewModel(
                 profileId = c.profileId,
                 sourceIds = c.sourceIds,
                 type = MediaType.MOVIE,
-                alphaRest = sortMode.value == SettingsRepository.SortMode.ALPHA,
+                alphabetical = sortMode.value == SettingsRepository.SortMode.ALPHA,
                 key = key,
             )
         }
@@ -860,7 +860,7 @@ class MovieViewModel(
         _categoryMoveState.value = null
         viewModelScope.launch {
             val pid = currentProfileId() ?: return@launch
-            customize.setCategoryOrder(pid, MediaType.MOVIE, s.keys)
+            customize.saveCategoryMove(pid, MediaType.MOVIE, s.keys, s.carried)
         }
     }
 
@@ -944,8 +944,8 @@ class MovieViewModel(
                 else -> return@launch
             }
             val items = when (key) {
-                is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, 5000)
-                is LiveKey.Custom -> customCategoryDao.snapshotMovies(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
+                is LiveKey.Folder -> movieDao.snapshotByCategoryManual(key.id, pid, contextKey, false, 5000)
+                is LiveKey.Custom -> customCategoryDao.snapshotMovies(pid, key.id, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, false, 5000)
                 LiveKey.Favorites -> movieDao.snapshotFavoritesManual(pid, contextKey, ctx.value.sourceIds.ifEmpty { listOf(-1L) }, 5000)
                 LiveKey.History, LiveKey.All -> return@launch
             }
@@ -1032,7 +1032,7 @@ class MovieViewModel(
             }
             LiveKey.Favorites -> movieDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
             LiveKey.History -> movieDao.pagingHistory(c.profileId, ids)
-            is LiveKey.Custom -> customCategoryDao.pagingMovies(c.profileId, key.id, ids)
+            is LiveKey.Custom -> customCategoryDao.pagingMovies(c.profileId, key.id, ids, alpha = !playlist)
             is LiveKey.Folder -> {
                 val ctxKey = folderContextKeys.value[key.id] ?: ""
                 when {
@@ -1041,7 +1041,7 @@ class MovieViewModel(
                     // Fast path: no manual order in this folder → the plain indexed query has
                     // the identical (sortOrder, name) order without the join-sort.
                     ctxKey !in orderedContexts.value -> movieDao.pagingByCategory(key.id)
-                    else -> movieDao.pagingByCategoryManual(key.id, c.profileId, ctxKey)
+                    else -> movieDao.pagingByCategoryManual(key.id, c.profileId, ctxKey, alpha = !playlist)
                 }
             }
         } else when (key) {
