@@ -10,10 +10,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,11 +30,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
@@ -33,6 +44,9 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import tv.own.owntv.core.util.Perf
 import tv.own.owntv.core.launcher.LauncherDeepLink
+import tv.own.owntv.ui.components.BrandMark
+import tv.own.owntv.ui.components.Wordmark
+import tv.own.owntv.ui.components.rememberAppliedIcon
 import tv.own.owntv.features.profiles.ProfileGate
 import tv.own.owntv.features.profiles.ProfileGateSessionViewModel
 import tv.own.owntv.features.profiles.ProfilesViewModel
@@ -89,8 +103,7 @@ open class MainActivity : ComponentActivity() {
      * stays up until then and Home never flashes on the way. Owned by this activity, so a relaunch in a
      * process that is still alive waits again.
      */
-    @Volatile
-    private var startupSettled = false
+    private var startupSettled by mutableStateOf(false)
 
     private val player: tv.own.owntv.player.OwnTVPlayer by inject()
     private val previewEngine: tv.own.owntv.player.LivePreviewEngine by inject()
@@ -488,10 +501,45 @@ open class MainActivity : ComponentActivity() {
                             // frame is safer than rendering protected content if a new state is added.
                             else -> Unit
                         }
+
+                        SplashOverlay(
+                            visible = !startupSettled,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                         } // end foreground Box (above the background layer)
                     }
                     } // end LocalizedContent
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplashOverlay(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(100)),
+        exit = fadeOut(animationSpec = tween(300)),
+        modifier = modifier,
+    ) {
+        val icon = rememberAppliedIcon()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(tv.own.owntv.ui.theme.LocalStagePalette.current.page),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                BrandMark(icon = icon, size = 112.dp, followAccent = false)
+                Spacer(modifier = Modifier.height(24.dp))
+                Wordmark(width = 240.dp)
             }
         }
     }
